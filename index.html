@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>To-Do List</title>
+  </head>
+  <body>
+    <h1>To-Do List</h1>
+    <ul id="task-list">
+      {% for task in tasks %}
+      <li>
+        <input type="checkbox" {% if task.completed %}checked{% endif %} onchange="updateTask({{ task.id }}, this.checked)">
+        {{ task.name }}
+      </li>
+      {% endfor %}
+    </ul>
+    <form id="new-task-form" onsubmit="addTask(event)">
+      <input type="text" id="new-task-input">
+      <button type="submit">Add Task</button>
+    </form>
+
+    <script>
+      function updateTask(id, completed) {
+        fetch('/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `
+              mutation {
+                updateTask(id: "${id}", completed: ${completed}) {
+                  task {
+                    id
+                    name
+                    completed
+                  }
+                }
+              }
+            `
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          const task = data.data.updateTask.task;
+          const checkbox = document.querySelector(`input[type=checkbox][value=${task.id}]`);
+          checkbox.checked = task.completed;
+        });
+      }
+
+      function addTask(event) {
+        event.preventDefault();
+        const input = document.querySelector('#new-task-input');
+        const name = input.value;
+        input.value = '';
+        fetch('/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `
+              mutation {
+                createTask(name: "${name}") {
+                  task {
+                    id
+                    name
+                    completed
+                  }
+                }
+              }
+            `
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          const task = data.data.createTask.task;
+          const li = document.createElement('li');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = task.id;
+          checkbox.checked = task.completed;
+          checkbox.onchange = () => updateTask(task.id, checkbox.checked);
+          const label = document.createTextNode(task.name);
+          li.appendChild(checkbox);
+          li.appendChild(label);
+          document.querySelector('#task-list').appendChild(li);
+        });
+      }
+    </script>
+  </body>
+</html>
